@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>SRTSync — Sincroniza tus subtítulos</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#"><span class="brand-mark">S</span><span>SRT<span class="accent">Sync</span></span></a>
+      <span class="status-dot">Procesamiento local</span>
+    </header>
+
+    <section id="home-view" class="view">
+      <div class="hero">
+        <p class="eyebrow">SUBTITLE WORKSPACE</p>
+        <h1>Audio dentro.<br><span>Subtítulos listos.</span></h1>
+        <p class="intro">Alinea tu guion con el audio y crea archivos SRT precisos en segundos.</p>
+      </div>
+
+      <div class="workspace-grid">
+        <section class="panel upload-panel">
+          <div class="panel-heading"><span class="step">01</span><div><h2>Tu audio</h2><p>MP3, WAV o M4A · hasta 500 MB</p></div></div>
+          <label id="drop-zone" class="drop-zone" for="audio-input">
+            <input id="audio-input" type="file" accept="audio/mpeg,audio/wav,audio/x-m4a,audio/mp4,.mp3,.wav,.m4a" />
+            <span class="upload-icon">↥</span><strong>Suelta tu audio aquí</strong><span>o <u>explora tus archivos</u></span>
+            <div id="file-info" class="file-info hidden"></div>
+          </label>
+        </section>
+        <section class="panel script-panel">
+          <div class="panel-heading"><span class="step">02</span><div><h2>Tu guion</h2><p>Una frase por línea, sin números ni tiempos</p></div></div>
+          <textarea id="script-input" placeholder="Pega aquí el texto de tu guion...\n\nCada línea se convertirá en un subtítulo."></textarea>
+          <div class="line-count"><span id="line-count">0</span> líneas detectadas</div>
+        </section>
+      </div>
+      <div class="action-row"><button id="sync-btn" class="primary-btn" disabled><span>Sincronizar audio</span><span class="arrow">→</span></button><p class="privacy">▣ Tus archivos nunca salen de tu dispositivo</p></div>
+    </section>
+
+    <section id="result-view" class="view hidden">
+      <div class="result-head"><div><button id="back-btn" class="back-btn">← Volver al proyecto</button><p class="eyebrow">RESULTADO</p><h1>Tu sincronización</h1><p class="intro">Revisa y ajusta los tiempos antes de exportar.</p></div><div class="result-actions"><button id="copy-btn" class="secondary-btn">▣ Copiar SRT</button><button id="download-btn" class="primary-btn"><span>↓ Descargar .srt</span></button></div></div>
+      <div class="result-meta"><span id="result-file">audio.mp3</span><span class="meta-separator">•</span><span id="result-count">0 subtítulos</span><span class="hint">Haz clic en cualquier tiempo para editarlo</span></div>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>TIEMPO ASIGNADO <small>EDITABLE</small></th><th>TEXTO DE LA FRASE</th></tr></thead><tbody id="subtitle-table"></tbody></table></div>
+    </section>
+    <div id="toast" class="toast"></div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

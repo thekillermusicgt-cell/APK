@@ -1,0 +1,9 @@
+{
+  "name": "srtsync-flow-automator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automatizador local opcional para enviar lotes de SRTSync a Google Flow.",
+  "main": "server.js",
+  "scripts": {"start":"node server.js","install-browser":"npx playwright install chromium"},
+  "dependencies": {"express":"^4.21.2","playwright":"^1.52.0"}
+}

@@ -1,18 +1,9 @@
 @echo off
+setlocal
 cd /d "%~dp0"
-title SRTSync Flow Automator
-echo.
-echo ==============================================
-echo   SRTSync Flow Automator
-echo ==============================================
-echo.
-echo Iniciando el automatizador local...
-echo No cierres esta ventana mientras uses SRTSync.
-echo.
-npm start
-if errorlevel 1 (
-  echo.
-  echo El automatizador no pudo iniciarse.
-  echo Ejecuta instalar-automatizador.bat y vuelve a intentarlo.
-)
+set "NODE_PATH=C:\Program Files\nodejs"
+if exist "%NODE_PATH%\node.exe" set "PATH=%NODE_PATH%;%PATH%"
+if exist "%ProgramFiles(x86)%\nodejs\node.exe" set "PATH=%ProgramFiles(x86)%\nodejs;%PATH%"
+echo Iniciando SRTSync Flow Automator conectado a tu Chrome...
+call npm start
 pause

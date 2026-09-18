@@ -1,8 +1,280 @@
-const $=s=>document.querySelector(s);const audioInput=$('#audio-input'),dropZone=$('#drop-zone'),fileInfo=$('#file-info'),scriptInput=$('#script-input'),syncBtn=$('#sync-btn');let subtitles=[],batches=[],currentBatch=0,audio={file:null,duration:0};
-const lines=()=>scriptInput.value.split(/\n/).map(x=>x.trim()).filter(Boolean);const time=x=>{x=Math.max(0,x);return [Math.floor(x/3600),Math.floor(x%3600/60),Math.floor(x%60)].map(n=>String(n).padStart(2,'0')).join(':')+','+String(Math.round((x-Math.floor(x))*1000)).padStart(3,'0')};const parse=x=>{const m=x.match(/^(\d{2}):(\d{2}):(\d{2}),(\d{3})$/);return m? +m[1]*3600+ +m[2]*60+ +m[3]+ +m[4]/1000:null};function update(){('#line-count' in {})?0:0;$('#line-count').textContent=lines().length;syncBtn.disabled=!audio.file||!lines().length}function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}function esc(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
-function setFile(f){if(!f)return;if(!/\.(mp3|wav|m4a)$/i.test(f.name))return toast('Selecciona un archivo MP3, WAV o M4A');audio.file=f;fileInfo.textContent='✓ '+f.name;fileInfo.classList.remove('hidden');const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>audio.duration=a.duration;update()}audioInput.onchange=e=>setFile(e.target.files[0]);dropZone.ondrop=e=>{e.preventDefault();setFile(e.dataTransfer.files[0])};['dragenter','dragover'].forEach(x=>dropZone.addEventListener(x,e=>{e.preventDefault();dropZone.classList.add('dragging')}));['dragleave','drop'].forEach(x=>dropZone.addEventListener(x,e=>{e.preventDefault();dropZone.classList.remove('dragging')}));scriptInput.oninput=update;
-function switchView(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('hidden',v.id!==id));document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.view===id));scrollTo(0,0)}function createSubs(){const a=lines(),total=a.reduce((n,x)=>n+x.length,0),duration=audio.duration||Math.max(3,a.length*3);let cursor=0;subtitles=a.map((text,i)=>{const span=Math.max(1.1,duration*text.length/total),start=cursor,end=Math.min(duration,start+span);cursor=end+.12;return{number:i+1,start:time(start),end:time(end),text}});renderSubs();$('#result-file').textContent=audio.file.name;$('#result-count').textContent=a.length+' subtítulos';switchView('result-view')}
-function renderSubs(){const t=$('#subtitle-table');t.innerHTML=subtitles.map((s,i)=>`<tr><td>${i+1}</td><td><input class="time-input" data-i="${i}" value="${s.start} --> ${s.end}"></td><td class="text-cell">${esc(s.text)}</td></tr>`).join('');t.querySelectorAll('.time-input').forEach(e=>e.onchange=()=>{const p=e.value.split('-->').map(x=>x.trim()),s=subtitles[e.dataset.i];if(p.length===2&&parse(p[0])!==null&&parse(p[1])!==null){s.start=p[0];s.end=p[1]}else{e.value=s.start+' --> '+s.end;toast('Formato inválido')}})}function srt(){return subtitles.map(s=>`${s.number}\n${s.start} --> ${s.end}\n${s.text}`).join('\n\n')+'\n'}
-function detect(raw){const text=raw.replace(/\r/g,'').trim();if(!text)return[];const re=/(?:^|\n)\s*IMAGEN\s+\d+\b/gi,starts=[];let m;while((m=re.exec(text)))starts.push(m.index+(m[0][0]=='\n'?1:0));return starts.length?starts.map((n,i)=>text.slice(n,starts[i+1]||text.length).trim()):text.split(/\n\s*\n(?=Voz en off:)/i).filter(Boolean)}function prepare(){const p=detect($('#prompts-input').value);if(!p.length)return toast('Pega al menos un prompt');batches=[];for(let i=0;i<p.length;i+=15)batches.push(p.slice(i,i+15));currentBatch=0;$('#queue-panel').classList.remove('hidden');renderQueue();toast(p.length+' prompts preparados')}
-function renderQueue(){const b=batches[currentBatch]||[];$('#queue-title').textContent=`Lote ${currentBatch+1} de ${batches.length}`;$('#queue-status').textContent='Listo para enviar';$('#queue-badge').textContent='PENDIENTE';$('#queue-progress').style.width=(currentBatch/batches.length*100)+'%';$('#batch-preview').innerHTML=b.map((p,i)=>`<article><span>${currentBatch*15+i+1}</span><pre>${esc(p)}</pre></article>`).join('');$('#complete-batch-btn').disabled=true}function batchText(){return batches[currentBatch].join('\n\n')}async function copyBatch(){await navigator.clipboard.writeText(batchText());$('#complete-batch-btn').disabled=false;toast('Lote copiado al portapapeles')}async function sendToAutomator(){try{const r=await fetch('http://127.0.0.1:8787/enqueue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({batch:batches[currentBatch],batchNumber:currentBatch+1,total:batches.length})});if(!r.ok)throw Error();$('#complete-batch-btn').disabled=false;$('#queue-status').textContent='Recibido por el automatizador';toast('Lote enviado al programa local')}catch(e){toast('Automatizador no conectado. Ejecuta flow-automator y reintenta')}}
-syncBtn.onclick=createSubs;$('#prepare-btn').onclick=prepare;$('#prompts-input').oninput=()=>{const n=detect($('#prompts-input').value).length;$('#prompt-count').textContent=n;$('#batch-count').textContent=Math.ceil(n/15)||0};$('#copy-batch-btn').onclick=copyBatch;$('#send-flow-btn').onclick=sendToAutomator;$('#open-flow-btn').onclick=()=>open('https://labs.google/fx/tools/flow','_blank');$('#complete-batch-btn').onclick=()=>{currentBatch++;if(currentBatch<batches.length)renderQueue();else{renderQueue();toast('Todos los lotes procesados')}};$('#clear-prompts-btn').onclick=()=>{$('#prompts-input').value='';$('#queue-panel').classList.add('hidden');$('#prompt-count').textContent='0';$('#batch-count').textContent='0'};$('#back-btn').onclick=()=>switchView('home-view');$('#download-btn').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([srt()],{type:'text/plain'}));a.download=(audio.file?.name.replace(/\.[^.]+$/,'')||'subtitulos')+'.srt';a.click()};$('#copy-btn').onclick=()=>navigator.clipboard.writeText(srt());document.querySelectorAll('.nav-tab').forEach(b=>b.onclick=()=>switchView(b.dataset.view));update();
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>SRTSync — Generación local por bloques</title>
+    <style>
+      :root {
+        --bg: #0b0d12;
+        --panel: #111827;
+        --panel-2: #151d2a;
+        --border: #2b384d;
+        --text: #eef3ff;
+        --muted: #a3afc5;
+        --accent: #9bea5d;
+        --accent-2: #78d0ff;
+        --danger: #ff7d7d;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      main.app-shell {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 24px 18px 60px;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 18px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: rgba(17, 24, 39, 0.85);
+        margin-bottom: 24px;
+      }
+      .brand { color: var(--text); text-decoration: none; font-size: 1.8rem; font-weight: 700; }
+      .brand span.accent { color: var(--accent); }
+      .status-dot {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .status-dot::before {
+        content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px rgba(155, 234, 93, 0.9);
+      }
+      .hero {
+        margin: 28px 0 20px;
+        padding: 18px 4px;
+      }
+      .eyebrow {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.72rem;
+        margin: 0 0 12px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(2.3rem, 6vw, 5rem);
+        line-height: 0.94;
+      }
+      .hero .accent { color: var(--accent); }
+      .hero .intro {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 1.06rem;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .panel {
+        background: rgba(21, 29, 42, 0.92);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px 18px 20px;
+      }
+      .panel h2 {
+        margin: 0 0 16px;
+        font-size: 1.2rem;
+      }
+      .panel p { margin-top: 0; color: var(--muted); }
+      .stack { display: grid; gap: 12px; }
+      label {
+        display: block;
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin-bottom: 6px;
+      }
+      textarea, input, select, button {
+        width: 100%;
+        font: inherit;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(9, 12, 18, 0.8);
+        color: var(--text);
+        padding: 10px 12px;
+      }
+      textarea {
+        min-height: 160px;
+        resize: vertical;
+      }
+      .inline-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(120px, 1fr));
+        gap: 12px;
+        margin-top: 8px;
+      }
+      button {
+        cursor: pointer;
+        width: auto;
+        font-weight: 700;
+        transition: transform 0.12s ease, opacity 0.12s ease;
+      }
+      button:hover { transform: translateY(-1px); }
+      button.primary {
+        background: var(--accent);
+        color: #0b0d12;
+        border-color: transparent;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--text);
+      }
+      .row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .status {
+        margin-top: 12px;
+        min-height: 24px;
+        color: #d6edb8;
+        white-space: pre-wrap;
+      }
+      .gallery {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+      }
+      .thumb {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        background: rgba(9, 12, 18, 0.8);
+      }
+      .thumb img {
+        width: 100%;
+        display: block;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+      }
+      .thumb .cap {
+        padding: 8px 10px;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+      .muted { color: var(--muted); }
+      .warning { color: #ffd585; }
+      @media (max-width: 820px) {
+        .grid { grid-template-columns: 1fr; }
+        .inline-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">SRT<span class="accent">Sync</span></div>
+        <div class="status-dot">Procesamiento local</div>
+      </header>
+
+      <section class="hero">
+        <p class="eyebrow">Subtitle workspace</p>
+        <h1>Audio dentro.<br /><span class="accent">Subtítulos listos.</span></h1>
+        <p class="intro">Genera escenas y frames por bloques desde prompts locales sin saturar tu GPU.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Quitar silencios</h2>
+        <p>Primero prepara el audio limpio. Luego usa el archivo resultante para las siguientes tareas.</p>
+        <div class="stack">
+          <div>
+            <label for="silence-audio-input">Audio</label>
+            <input id="silence-audio-input" type="file" accept="audio/*" />
+          </div>
+          <div class="inline-grid">
+            <div>
+              <label for="silence-min">Silencio mínimo</label>
+              <input id="silence-min" type="number" min="0.05" step="0.05" value="0.45" />
+            </div>
+            <div>
+              <label for="silence-threshold">Umbral (dB)</label>
+              <input id="silence-threshold" type="number" min="-80" max="0" step="1" value="-42" />
+            </div>
+            <div>
+              <label>Archivo</label>
+              <button id="process-silence-btn" class="secondary" type="button">Procesar</button>
+            </div>
+          </div>
+          <div id="silence-status" class="status"></div>
+          <div class="row-actions">
+            <button id="download-silence-btn" class="primary" type="button" disabled>Descargar audio sin silencios</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <h2>Tu guion</h2>
+          <textarea id="script-input" placeholder="Pega aquí el texto de tu guion, una frase por línea..."></textarea>
+          <div id="script-count" class="muted">0 líneas</div>
+        </section>
+
+        <section class="panel">
+          <h2>Generación local por bloques</h2>
+          <div class="stack">
+            <div>
+              <label for="local-prompts">Prompts</label>
+              <textarea id="local-prompts" placeholder="Pega aquí tus prompts, uno por línea o por IMAGEN 1, IMAGEN 2..."></textarea>
+            </div>
+            <div class="inline-grid">
+              <div>
+                <label for="local-block-size">Bloque</label>
+                <input id="local-block-size" type="number" min="1" value="4" />
+              </div>
+              <div>
+                <label for="local-width">Ancho</label>
+                <input id="local-width" type="number" min="256" step="64" value="768" />
+              </div>
+              <div>
+                <label for="local-height">Alto</label>
+                <input id="local-height" type="number" min="256" step="64" value="432" />
+              </div>
+              <div>
+                <label for="local-steps">Steps</label>
+                <input id="local-steps" type="number" min="1" max="80" value="25" />
+              </div>
+              <div>
+                <label for="local-cfg">CFG</label>
+                <input id="local-cfg" type="number" min="1" max="20" step="0.5" value="7" />
+              </div>
+              <div>
+                <label for="local-pause">Pausa (s)</label>
+                <input id="local-pause" type="number" min="0" max="30" value="3" />
+              </div>
+            </div>
+            <div>
+              <label for="comfy-model">Nombre del modelo</label>
+              <input id="comfy-model" type="text" value="model.safetensors" placeholder="model.safetensors" />
+            </div>
+            <div class="row-actions">
+              <button id="generate-local-btn" class="primary" type="button">Generar por bloques</button>
+              <button id="stop-local-btn" class="secondary" type="button">Detener</button>
+            </div>
+            <div id="local-status" class="status"></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <h2>Imágenes generadas</h2>
+        <div id="local-gallery" class="gallery"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
